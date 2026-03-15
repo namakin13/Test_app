@@ -1,0 +1,56 @@
+    Checking tauri-appaudio-switcher v0.1.0 (C:\閾ｪ菴懊・繝ｭ繧ｸ繧ｧ繧ｯ繝・髻ｳ螢ｰ蜃ｺ蜉帛・繧頑崛縺・src-tauri)
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+  --> src\main.rs:59:21
+   |
+59 |     let mut icons = get_custom_icons(app_handle.clone())?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `?` operator cannot be applied to type `impl Future<Output = Result<HashMap<String, String>, String>>`
+   |
+   = help: the trait `Try` is not implemented for `impl Future<Output = Result<HashMap<String, String>, String>>`
+   = note: the full name for the type has been written to 'C:\閾ｪ菴懊・繝ｭ繧ｸ繧ｧ繧ｯ繝・髻ｳ螢ｰ蜃ｺ蜉帛・繧頑崛縺・src-tauri\target\debug\deps\tauri_appaudio_switcher-db1a152a40ec70fd.long-type-6697758407655185908.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+help: consider `await`ing on the `Future`
+   |
+59 |     let mut icons = get_custom_icons(app_handle.clone()).await?;
+   |                                                         ++++++
+
+error[E0282]: type annotations needed
+  --> src\main.rs:59:9
+   |
+59 |     let mut icons = get_custom_icons(app_handle.clone())?;
+   |         ^^^^^^^^^
+60 |     icons.insert(appid, base64_data);
+   |     ----- type must be known at this point
+   |
+help: consider giving `icons` an explicit type
+   |
+59 |     let mut icons: /* Type */ = get_custom_icons(app_handle.clone())?;
+   |                  ++++++++++++
+
+error[E0308]: mismatched types
+  --> src\main.rs:94:5
+   |
+94 |     save_custom_icon(app_handle, appid, base64_data_uri)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), String>`, found future
+   |
+note: calling an async function returns a future
+  --> src\main.rs:94:5
+   |
+94 |     save_custom_icon(app_handle, appid, base64_data_uri)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: consider `await`ing on the `Future`
+   |
+94 |     save_custom_icon(app_handle, appid, base64_data_uri).await
+   |                                                         ++++++
+
+warning: unused import: `windows::Win32::UI::Shell::PropertiesSystem`
+  --> src\audio_manager.rs:11:5
+   |
+11 | use windows::Win32::UI::Shell::PropertiesSystem::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0277, E0282, E0308.
+For more information about an error, try `rustc --explain E0277`.
+warning: `tauri-appaudio-switcher` (bin "tauri-appaudio-switcher") generated 1 warning
+error: could not compile `tauri-appaudio-switcher` (bin "tauri-appaudio-switcher") due to 3 previous errors; 1 warning emitted

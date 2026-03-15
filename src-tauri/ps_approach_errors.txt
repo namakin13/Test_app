@@ -1,0 +1,174 @@
+﻿
+> error[E0308]: mismatc
+hed types
+    --> src\audio_manag
+er.rs:46:63
+     |
+  46 | ...             
+      if prop.Anonymous
+.Anonymous.vt == VT_LPW
+STR.0 {
+     |                 
+         --------------
+-------------    ^^^^^^
+^^^^^ expected `VARENUM
+`, found `u16`
+     |                 
+         |
+     |                 
+         expected becau
+se this is `VARENUM`
+     |
+  help: consider removi
+ng the tuple struct fie
+ld `0`
+     |
+  46 -                 
+            if prop.Ano
+nymous.Anonymous.vt == 
+VT_LPWSTR.0 {
+> error[E0599]: no func
+tion or associated item
+ named `from_win32` fou
+nd for struct `windows_
+result::error::Error` i
+n the current scope
+     --> src\audio_mana
+ger.rs:110:29
+      |
+> 110 |         .map_er
+r(|e| Error::from_win32
+(0, format!("Failed to 
+run PowerShell: {}", e)
+))?;
+>     |                
+             ^^^^^^^^^^
+ function or associated
+ item not found in `win
+dows_result::error::Err
+or`
+      |
+> note: if you're tryin
+g to build a new `windo
+ws_result::error::Error
+` consider using one of
+ the following associat
+ed functions:
+>       windows_result:
+:error::Error::empty
+>       windows_result:
+:error::Error::new
+>       windows_result:
+:error::Error::from_hre
+sult
+>       windows_result:
+:error::Error::from_thr
+ead
+>    --> C:\Users\nofxy
+\.cargo\registry\src\in
+dex.crates.io-1949cf8c6
+b5b557f\windows-result-
+0.4.1\src\error.rs:82:5
+      |
+   82 |     pub const f
+n empty() -> Self {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
+  ...
+   91 |     pub fn new<
+T: AsRef<str>>(code: HR
+ESULT, message: T) -> S
+elf {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^
+  ...
+  110 |     pub fn from
+_hresult(code: HRESULT)
+ -> Self {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
+  ...
+> error[E0599]: no func
+tion or associated item
+ named `from_win32` fou
+nd for struct `windows_
+result::error::Error` i
+n the current scope
+     --> src\audio_mana
+ger.rs:114:27
+      |
+> 114 |         return 
+Err(Error::from_win32(0
+, format!("PowerShell e
+rror: {}", err)));
+>     |                
+           ^^^^^^^^^^ f
+unction or associated i
+tem not found in `windo
+ws_result::error::Error
+`
+      |
+> note: if you're tryin
+g to build a new `windo
+ws_result::error::Error
+` consider using one of
+ the following associat
+ed functions:
+>       windows_result:
+:error::Error::empty
+>       windows_result:
+:error::Error::new
+>       windows_result:
+:error::Error::from_hre
+sult
+>       windows_result:
+:error::Error::from_thr
+ead
+>    --> C:\Users\nofxy
+\.cargo\registry\src\in
+dex.crates.io-1949cf8c6
+b5b557f\windows-result-
+0.4.1\src\error.rs:82:5
+      |
+   82 |     pub const f
+n empty() -> Self {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
+  ...
+   91 |     pub fn new<
+T: AsRef<str>>(code: HR
+ESULT, message: T) -> S
+elf {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^
+  ...
+  110 |     pub fn from
+_hresult(code: HRESULT)
+ -> Self {
+      |     ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
+  ...
+> Some errors have deta
+iled explanations: E030
+8, E0599.
+> For more information 
+about an error, try `ru
+stc --explain E0308`.
+  warning: `tauri-appau
+dio-switcher` (bin "tau
+ri-appaudio-switcher") 
+generated 1 warning
+> error: could not comp
+ile `tauri-appaudio-swi
+tcher` (bin "tauri-appa
+udio-switcher") due to 
+3 previous errors; 1 wa
+rning emitted
+
+

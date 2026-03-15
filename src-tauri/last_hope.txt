@@ -1,0 +1,114 @@
+﻿
+> error[E0308]: mismatc
+hed types
+    --> src\audio_manag
+er.rs:47:63
+     |
+  47 | ...             
+      if prop.Anonymous
+.Anonymous.vt == VT_LPW
+STR.0 {
+     |                 
+         --------------
+-------------    ^^^^^^
+^^^^^ expected `VARENUM
+`, found `u16`
+     |                 
+         |
+     |                 
+         expected becau
+se this is `VARENUM`
+     |
+  help: consider removi
+ng the tuple struct fie
+ld `0`
+     |
+  47 -                 
+            if prop.Ano
+nymous.Anonymous.vt == 
+VT_LPWSTR.0 {
+  47 +                 
+            if prop.Ano
+nymous.Anonymous.vt == 
+VT_LPWSTR {
+     |
+  System.Management.Aut
+omation.RemoteException
+> error[E0277]: the tra
+it bound `windows_core:
+:GUID: From<&str>` is n
+ot satisfied
+     --> src\audio_mana
+ger.rs:80:41
+      |
+   80 |         let cls
+id_policy_config: GUID 
+= GUID::from("870af99c-
+171d-4f9e-af0d-e63df40c
+2bc9");
+      |                
+                       
+  ^^^^ the trait `From<
+&str>` is not implement
+ed for `windows_core::G
+UID`
+      |
+  help: the trait `From
+<&str>` is not implemen
+ted for `windows_core::
+GUID`
+        but trait `From
+<u128>` is implemented 
+for it
+     --> C:\Users\nofxy
+\.cargo\registry\src\in
+dex.crates.io-1949cf8c6
+b5b557f\windows-core-0.
+62.2\src\guid.rs:155:1
+      |
+  155 | impl From<u128>
+ for GUID {
+      | ^^^^^^^^^^^^^^^
+^^^^^^^^^
+      = help: for that 
+trait implementation, e
+xpected `u128`, found `
+&str`
+  System.Management.Aut
+omation.RemoteException
+  warning: unused impor
+t: `windows::Win32::UI:
+:Shell::PropertiesSyste
+m`
+   --> src\audio_manage
+r.rs:7:5
+    |
+  7 | use windows::Win3
+2::UI::Shell::Propertie
+sSystem::*;
+    |     ^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^
+    |
+    = note: `#[warn(unu
+sed_imports)]` (part of
+ `#[warn(unused)]`) on 
+by default
+> Some errors have deta
+iled explanations: E027
+7, E0308.
+> For more information 
+about an error, try `ru
+stc --explain E0277`.
+  warning: `tauri-appau
+dio-switcher` (bin "tau
+ri-appaudio-switcher") 
+generated 1 warning
+> error: could not comp
+ile `tauri-appaudio-swi
+tcher` (bin "tauri-appa
+udio-switcher") due to 
+2 previous errors; 1 wa
+rning emitted
+
+
