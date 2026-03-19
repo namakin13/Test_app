@@ -20,12 +20,24 @@ interface SteamGame {
 }
 
 const GameBanner = ({ game, customIcon }: { game: SteamGame, customIcon?: string }) => {
+  const [localCacheImg, setLocalCacheImg] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<string | null>("get_local_steam_image", { appid: game.appid })
+      .then(res => {
+        if (res) setLocalCacheImg(res);
+      })
+      .catch(console.error);
+  }, [game.appid]);
+
   const fallbacks = customIcon ? [
     customIcon,
+    ...(localCacheImg ? [localCacheImg] : []),
     game.header_image_url,
     `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
     `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`
   ] : [
+    ...(localCacheImg ? [localCacheImg] : []),
     game.header_image_url,
     `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
     `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`

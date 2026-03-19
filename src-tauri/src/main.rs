@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 use audio_manager::{list_devices, set_default_device, AudioDevice};
-use steam_manager::{get_steam_games, launch_steam_app, launch_steam_game};
+use steam_manager::{get_steam_games, launch_steam_app, launch_steam_game, get_local_steam_image};
 
 #[tauri::command]
 fn get_audio_devices() -> Result<Vec<AudioDevice>, String> {
@@ -105,7 +105,8 @@ fn main() {
             launch_steam_app,
             get_custom_icons,
             save_custom_icon,
-            save_custom_icon_from_path
+            save_custom_icon_from_path,
+            get_local_steam_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
