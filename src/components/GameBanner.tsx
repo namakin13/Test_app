@@ -26,9 +26,9 @@ export const GameBanner = ({ game, customIcon }: GameBannerProps) => {
 
   // 正方形アイコン向けフォールバックチェーン:
   //   1. カスタムアイコン（ユーザー設定）
-  //   2. ローカルキャッシュ（icon.jpg 優先、header.jpg等にも自動フォールバック済み）
+  //   2. ローカルキャッシュ（library_600x900.jpg → header.jpg → {hash}.jpg の順）
   //   3. CDN library_600x900.jpg（縦長＝正方形トリミングに最適）
-  //   4. CDN header.jpg（最終手段）
+  //   4. CDN header.jpg（DLC・ツール等で portrait がない場合の保険）
   const cdnPortrait = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/library_600x900.jpg`;
   const cdnHeader = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`;
 

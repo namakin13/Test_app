@@ -191,30 +191,64 @@ pub async fn get_local_steam_image(appid: String) -> Result<Option<String>, Stri
         .join("appcache")
         .join("librarycache");
 
-    // icon.jpg を最優先に、サブディレクトリ構造（新しいSteam）をチェック
-    let subdir_candidates = [
-        (librarycache_dir.join(&appid).join("icon.jpg"), "png"),
-        (librarycache_dir.join(&appid).join("header.jpg"), "jpeg"),
-        (librarycache_dir.join(&appid).join("library_600x900.jpg"), "jpeg"),
-        (librarycache_dir.join(&appid).join("library_header.jpg"), "jpeg"),
-        (librarycache_dir.join(&appid).join("logo.png"), "png"),
+    let appid_dir = librarycache_dir.join(&appid);
+
+    // Priority 1: サブディレクトリ構造（新しいSteam）の標準ファイルをチェック
+    // ※ icon.jpg はSteamのキャッシュに存在しない。実際には {40文字ハッシュ}.jpg で保存される
+    let named_candidates = [
+        (appid_dir.join("library_600x900.jpg"), "jpeg"), // 縦長＝正方形トリミングに最適
+        (appid_dir.join("header.jpg"), "jpeg"),
+        (appid_dir.join("library_header.jpg"), "jpeg"),
+        (appid_dir.join("logo.png"), "png"),
     ];
 
-    // フラット構造（古いSteam: {appid}_icon.jpg 形式）もチェック
-    let flat_candidates = [
-        (librarycache_dir.join(format!("{}_icon.jpg", appid)), "png"),
-        (librarycache_dir.join(format!("{}_header.jpg", appid)), "jpeg"),
-        (librarycache_dir.join(format!("{}_library_600x900.jpg", appid)), "jpeg"),
-        (librarycache_dir.join(format!("{}_library_header.jpg", appid)), "jpeg"),
-    ];
-
-    // Priority 1: サブディレクトリ構造 → フラット構造の順でチェック
-    for (file_path, mime_type) in subdir_candidates.iter().chain(flat_candidates.iter()) {
+    for (file_path, mime_type) in named_candidates.iter() {
         if file_path.exists() {
             if let Ok(file_data) = fs::read(file_path) {
                 if file_data.len() > 16 {
                     let base64_str = general_purpose::STANDARD.encode(&file_data);
                     return Ok(Some(format!("data:image/{};base64,{}", mime_type, base64_str)));
+                }
+            }
+        }
+    }
+
+    // Priority 2: フラット構造（古いSteam: {appid}_xxx.jpg 形式）をチェック
+    let flat_candidates = [
+        (librarycache_dir.join(format!("{}_library_600x900.jpg", appid)), "jpeg"),
+        (librarycache_dir.join(format!("{}_header.jpg", appid)), "jpeg"),
+        (librarycache_dir.join(format!("{}_library_header.jpg", appid)), "jpeg"),
+    ];
+
+    for (file_path, mime_type) in flat_candidates.iter() {
+        if file_path.exists() {
+            if let Ok(file_data) = fs::read(file_path) {
+                if file_data.len() > 16 {
+                    let base64_str = general_purpose::STANDARD.encode(&file_data);
+                    return Ok(Some(format!("data:image/{};base64,{}", mime_type, base64_str)));
+                }
+            }
+        }
+    }
+
+    // Priority 3: ハッシュ名 .jpg ファイルを検索（Steam が {40文字ハッシュ}.jpg で保存するアイコン）
+    // 標準名のファイルが存在しないゲーム（DLC・ツール等）向けのフォールバック
+    if appid_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&appid_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                // {40文字の小文字16進数}.jpg にマッチするファイルを使用
+                if name_str.len() == 44
+                    && name_str.ends_with(".jpg")
+                    && name_str[..40].chars().all(|c| c.is_ascii_hexdigit())
+                {
+                    if let Ok(file_data) = fs::read(entry.path()) {
+                        if file_data.len() > 16 {
+                            let base64_str = general_purpose::STANDARD.encode(&file_data);
+                            return Ok(Some(format!("data:image/jpeg;base64,{}", base64_str)));
+                        }
+                    }
                 }
             }
         }
