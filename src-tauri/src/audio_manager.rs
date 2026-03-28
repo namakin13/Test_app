@@ -8,7 +8,6 @@ use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::StructuredStorage::*;
 use windows::Win32::System::Com::*;
 use windows::Win32::System::Variant::*;
-use windows::Win32::UI::Shell::PropertiesSystem::*;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct AudioDevice {
@@ -311,4 +310,22 @@ Add-Type -TypeDefinition $code; [Switcher]::Set($id)"#,
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_audio_devices() -> std::result::Result<Vec<AudioDevice>, String> {
+    println!("Command: get_audio_devices called");
+    list_devices().map_err(|e| {
+        println!("Error in get_audio_devices: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+pub fn switch_audio_device(id: String) -> std::result::Result<(), String> {
+    println!("Command: switch_audio_device called with id: {}", id);
+    set_default_device(id).map_err(|e| {
+        println!("Error in switch_audio_device: {}", e);
+        e.to_string()
+    })
 }

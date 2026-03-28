@@ -1,0 +1,68 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Gamepad2 } from "lucide-react";
+
+interface SteamGame {
+  name: string;
+  appid: string;
+  header_image_url: string;
+}
+
+interface GameBannerProps {
+  game: SteamGame;
+  customIcon?: string;
+}
+
+export const GameBanner = ({ game, customIcon }: GameBannerProps) => {
+  const [localCacheImg, setLocalCacheImg] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<string | null>("get_local_steam_image", { appid: game.appid })
+      .then(res => {
+        if (res) setLocalCacheImg(res);
+      })
+      .catch(console.error);
+  }, [game.appid]);
+
+  const fallbacks = customIcon ? [
+    customIcon,
+    ...(localCacheImg ? [localCacheImg] : []),
+    game.header_image_url,
+    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+  ] : [
+    ...(localCacheImg ? [localCacheImg] : []),
+    game.header_image_url,
+    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+  ];
+
+  const [imgIndex, setImgIndex] = useState(0);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    setImgIndex(0);
+    setIsError(false);
+  }, [game.appid, customIcon]);
+
+  return (
+    <div className="game-banner-container">
+      <img
+        src={fallbacks[imgIndex]}
+        alt={game.name}
+        className="game-banner"
+        style={isError ? { display: 'none' } : undefined}
+        onError={() => {
+          if (imgIndex < fallbacks.length - 1) {
+            setImgIndex(prev => prev + 1);
+          } else {
+            setIsError(true);
+          }
+        }}
+      />
+      <div className={`game-banner-fallback ${isError ? '' : 'hidden'}`}>
+        <Gamepad2 size={48} opacity={0.2} />
+      </div>
+    </div>
+  );
+};
