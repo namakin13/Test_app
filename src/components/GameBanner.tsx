@@ -24,17 +24,23 @@ export const GameBanner = ({ game, customIcon }: GameBannerProps) => {
       .catch(console.error);
   }, [game.appid]);
 
+  // 正方形アイコン向けフォールバックチェーン:
+  //   1. カスタムアイコン（ユーザー設定）
+  //   2. ローカルキャッシュ（icon.jpg 優先、header.jpg等にも自動フォールバック済み）
+  //   3. CDN library_600x900.jpg（縦長＝正方形トリミングに最適）
+  //   4. CDN header.jpg（最終手段）
+  const cdnPortrait = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/library_600x900.jpg`;
+  const cdnHeader = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`;
+
   const fallbacks = customIcon ? [
     customIcon,
     ...(localCacheImg ? [localCacheImg] : []),
-    game.header_image_url,
-    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
-    `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+    cdnPortrait,
+    cdnHeader,
   ] : [
     ...(localCacheImg ? [localCacheImg] : []),
-    game.header_image_url,
-    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
-    `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+    cdnPortrait,
+    cdnHeader,
   ];
 
   const [imgIndex, setImgIndex] = useState(0);
