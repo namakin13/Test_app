@@ -39,8 +39,9 @@ fn parse_acf_file(path: &PathBuf) -> Option<SteamGame> {
         }
 
         if !name.is_empty() && !appid.is_empty() {
+            // 正方形アイコン表示に最適な縦長画像をCDNフォールバック用として設定
             let header_image_url = format!(
-                "https://cdn.akamai.steamstatic.com/steam/apps/{}/header.jpg",
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{}/library_600x900.jpg",
                 appid
             );
             return Some(SteamGame {
@@ -186,23 +187,31 @@ pub async fn get_local_steam_image(appid: String) -> Result<Option<String>, Stri
         None => return Ok(None),
     };
 
-    let game_cache_dir = PathBuf::from(steam_path)
+    let librarycache_dir = PathBuf::from(&steam_path)
         .join("appcache")
-        .join("librarycache")
-        .join(&appid);
+        .join("librarycache");
 
-    let candidates = [
-        ("header.jpg", "jpeg"),
-        ("library_600x900.jpg", "jpeg"),
-        ("library_header.jpg", "jpeg"),
-        ("logo.png", "png"),
+    // icon.jpg を最優先に、サブディレクトリ構造（新しいSteam）をチェック
+    let subdir_candidates = [
+        (librarycache_dir.join(&appid).join("icon.jpg"), "png"),
+        (librarycache_dir.join(&appid).join("header.jpg"), "jpeg"),
+        (librarycache_dir.join(&appid).join("library_600x900.jpg"), "jpeg"),
+        (librarycache_dir.join(&appid).join("library_header.jpg"), "jpeg"),
+        (librarycache_dir.join(&appid).join("logo.png"), "png"),
     ];
 
-    // Priority 1: Check standard librarycache images
-    for (filename, mime_type) in candidates.iter() {
-        let file_path = game_cache_dir.join(filename);
+    // フラット構造（古いSteam: {appid}_icon.jpg 形式）もチェック
+    let flat_candidates = [
+        (librarycache_dir.join(format!("{}_icon.jpg", appid)), "png"),
+        (librarycache_dir.join(format!("{}_header.jpg", appid)), "jpeg"),
+        (librarycache_dir.join(format!("{}_library_600x900.jpg", appid)), "jpeg"),
+        (librarycache_dir.join(format!("{}_library_header.jpg", appid)), "jpeg"),
+    ];
+
+    // Priority 1: サブディレクトリ構造 → フラット構造の順でチェック
+    for (file_path, mime_type) in subdir_candidates.iter().chain(flat_candidates.iter()) {
         if file_path.exists() {
-            if let Ok(file_data) = fs::read(&file_path) {
+            if let Ok(file_data) = fs::read(file_path) {
                 if file_data.len() > 16 {
                     let base64_str = general_purpose::STANDARD.encode(&file_data);
                     return Ok(Some(format!("data:image/{};base64,{}", mime_type, base64_str)));
