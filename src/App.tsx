@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones, SkipBack, Play, SkipForward, VolumeX } from "lucide-react";
 import { Icon } from "@iconify/react";
 import steamIcon from "@iconify-icons/simple-icons/steam";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +19,22 @@ function App() {
     customIcons, fetchAll, fetchGames, launchGame, launchSteam, saveCustomIcon,
   } = useSteam();
 
+  const [browserMuted, setBrowserMuted] = React.useState(false);
   const hoveredGameIdRef = React.useRef<string | null>(null);
+
+  const mediaBtnStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "44px",
+    height: "44px",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: "12px",
+    color: "white",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  };
 
   useEffect(() => {
     fetchDevices();
@@ -116,6 +132,42 @@ function App() {
                   <p className="loading-text">Loading devices...</p>
                 </div>
               ) : (
+                <>
+                {/* メディアコントロール */}
+                <div style={{
+                  display: "flex",
+                  gap: "8px",
+                  justifyContent: "center",
+                  marginBottom: "16px",
+                  padding: "12px",
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}>
+                  <button onClick={() => invoke("media_prev")} title="前へ" style={mediaBtnStyle}>
+                    <SkipBack size={18} />
+                  </button>
+                  <button onClick={() => invoke("media_play_pause")} title="再生/一時停止" style={mediaBtnStyle}>
+                    <Play size={18} />
+                  </button>
+                  <button onClick={() => invoke("media_next")} title="次へ" style={mediaBtnStyle}>
+                    <SkipForward size={18} />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const newMuted: boolean = await invoke("toggle_browser_mute");
+                      setBrowserMuted(newMuted);
+                    }}
+                    title="ブラウザミュート"
+                    style={{
+                      ...mediaBtnStyle,
+                      background: browserMuted ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.05)",
+                      borderColor: browserMuted ? "rgba(255,80,80,0.5)" : "rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <VolumeX size={18} />
+                  </button>
+                </div>
                 <div className="device-list">
                   <AnimatePresence mode="popLayout">
                     {devices.length > 0 ? (
@@ -147,6 +199,7 @@ function App() {
                     )}
                   </AnimatePresence>
                 </div>
+                </>
               )}
             </motion.div>
           ) : (

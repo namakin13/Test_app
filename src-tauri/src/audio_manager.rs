@@ -329,3 +329,129 @@ pub fn switch_audio_device(id: String) -> std::result::Result<(), String> {
         e.to_string()
     })
 }
+
+// ===== メディアキー送信 =====
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY,
+};
+
+/// Windows API の SendInput でメディアキーの押下・離上をシミュレートする
+fn send_media_key(vk: u16) {
+    let inputs = [
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(vk),
+                    wScan: 0,
+                    dwFlags: KEYBD_EVENT_FLAGS(0),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(vk),
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+    ];
+    unsafe {
+        let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// 再生/一時停止 (VK_MEDIA_PLAY_PAUSE = 0xB3)
+#[tauri::command]
+pub fn media_play_pause() {
+    send_media_key(0xB3);
+}
+
+/// 次のトラック (VK_MEDIA_NEXT_TRACK = 0xB0)
+#[tauri::command]
+pub fn media_next() {
+    send_media_key(0xB0);
+}
+
+/// 前のトラック (VK_MEDIA_PREV_TRACK = 0xB1)
+#[tauri::command]
+pub fn media_prev() {
+    send_media_key(0xB1);
+}
+
+// ===== ブラウザ個別ミュート =====
+// windows::Win32::Media::Audio::* はファイル先頭でワイルドカードimport済み
+// (IAudioSessionControl2, IAudioSessionEnumerator, IAudioSessionManager2,
+//  ISimpleAudioVolume 等はすべて利用可能)
+
+/// Chrome / Edge / Firefox 等ブラウザのオーディオセッションをミュート切り替えする。
+/// 戻り値: ミュート後の状態 (true = ミュート中)
+#[tauri::command]
+pub fn toggle_browser_mute() -> std::result::Result<bool, String> {
+    use sysinfo::System;
+
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+        let result = (|| -> windows::core::Result<bool> {
+            let enumerator: IMMDeviceEnumerator =
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+            let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
+            let session_manager: IAudioSessionManager2 = device.Activate(CLSCTX_ALL, None)?;
+            let session_enumerator: IAudioSessionEnumerator =
+                session_manager.GetSessionEnumerator()?;
+            let count = session_enumerator.GetCount()?;
+
+            let mut system = System::new_all();
+            system.refresh_all();
+            let browsers = ["chrome", "msedge", "firefox", "opera", "brave", "vivaldi"];
+
+            let mut toggled = false;
+            let mut final_state = false;
+
+            for i in 0..count {
+                if let Ok(session) = session_enumerator.GetSession(i) {
+                    if let Ok(session2) = session.cast::<IAudioSessionControl2>() {
+                        if let Ok(pid) = session2.GetProcessId() {
+                            if pid > 0 {
+                                if let Some(process) =
+                                    system.process(sysinfo::Pid::from_u32(pid))
+                                {
+                                    let name =
+                                        process.name().to_string_lossy().to_lowercase();
+                                    if browsers.iter().any(|b| name.contains(b)) {
+                                        if let Ok(volume) =
+                                            session.cast::<ISimpleAudioVolume>()
+                                        {
+                                            if !toggled {
+                                                if let Ok(current_mute) = volume.GetMute() {
+                                                    final_state = !current_mute.as_bool();
+                                                    toggled = true;
+                                                }
+                                            }
+                                            let _ = volume.SetMute(final_state, std::ptr::null());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(final_state)
+        })();
+
+        match result {
+            Ok(state) => Ok(state),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
