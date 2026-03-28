@@ -186,23 +186,27 @@ pub async fn get_local_steam_image(appid: String) -> Result<Option<String>, Stri
         None => return Ok(None),
     };
 
-    let cache_dir = PathBuf::from(steam_path).join("appcache").join("librarycache");
+    let game_cache_dir = PathBuf::from(steam_path)
+        .join("appcache")
+        .join("librarycache")
+        .join(&appid);
 
     let candidates = [
-        format!("{}_library_600x900.jpg", appid),
-        format!("{}_header.jpg", appid),
-        format!("{}_capsule_616x353.jpg", appid),
-        format!("{}_logo.png", appid),
+        ("header.jpg", "jpeg"),
+        ("library_600x900.jpg", "jpeg"),
+        ("library_header.jpg", "jpeg"),
+        ("logo.png", "png"),
     ];
 
     // Priority 1: Check standard librarycache images
-    for filename in candidates.iter() {
-        let file_path = cache_dir.join(filename);
+    for (filename, mime_type) in candidates.iter() {
+        let file_path = game_cache_dir.join(filename);
         if file_path.exists() {
             if let Ok(file_data) = fs::read(&file_path) {
-                let base64_str = general_purpose::STANDARD.encode(&file_data);
-                let mime_type = if filename.ends_with(".png") { "png" } else { "jpeg" };
-                return Ok(Some(format!("data:image/{};base64,{}", mime_type, base64_str)));
+                if file_data.len() > 16 {
+                    let base64_str = general_purpose::STANDARD.encode(&file_data);
+                    return Ok(Some(format!("data:image/{};base64,{}", mime_type, base64_str)));
+                }
             }
         }
     }
