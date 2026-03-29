@@ -49,7 +49,7 @@ export const GameBanner = ({ game, customIcon }: GameBannerProps) => {
   useEffect(() => {
     setImgIndex(0);
     setIsError(false);
-  }, [game.appid, customIcon]);
+  }, [game.appid, customIcon, localCacheImg]);
 
   return (
     <div className="game-banner-container">

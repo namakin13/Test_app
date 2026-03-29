@@ -11,14 +11,18 @@ export const useAudio = () => {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDevices = async () => {
     setLoading(true);
+    setError(null);
     try {
       const result: AudioDevice[] = await invoke("get_audio_devices");
       setDevices(result);
-    } catch (error) {
-      console.error("Failed to fetch devices:", error);
+    } catch (err) {
+      console.error("Failed to fetch devices:", err);
+      // 修正: エラーを error ステートに格納してUIに伝播できるようにする
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -27,15 +31,18 @@ export const useAudio = () => {
   const switchDevice = async (id: string) => {
     if (switching) return;
     setSwitching(id);
+    setError(null);
     try {
       await invoke("switch_audio_device", { id });
       await fetchDevices();
-    } catch (error) {
-      console.error("Failed to switch device:", error);
+    } catch (err) {
+      console.error("Failed to switch device:", err);
+      // 修正: エラーを error ステートに格納してUIに伝播できるようにする
+      setError(String(err));
     } finally {
       setSwitching(null);
     }
   };
 
-  return { devices, loading, switching, fetchDevices, switchDevice };
+  return { devices, loading, switching, error, fetchDevices, switchDevice };
 };
