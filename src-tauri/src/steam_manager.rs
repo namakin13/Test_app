@@ -99,9 +99,43 @@ pub async fn get_steam_games() -> Result<Vec<SteamGame>, String> {
     Ok(games)
 }
 
+/// appid が数字のみで構成されているか検証する（純粋関数）
+/// Steam AppID は正規には正の整数値のため、数字以外は不正改造の可能性がある
+pub fn validate_appid(appid: &str) -> Result<(), String> {
+    if appid.is_empty() {
+        return Err("AppIDが空です".to_string());
+    }
+    if !appid.chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!(
+            "AppIDは数字のみで構成されるべきです (不正改造の可能性): '{}'",
+            appid
+        ));
+    }
+    Ok(())
+}
+
+/// icon_path がパストラバーサル攻撃を含んでいないか検証する（純粋関数）
+pub fn validate_icon_path(path: &str) -> Result<(), String> {
+    if path.is_empty() {
+        return Err("アイコンパスが空です".to_string());
+    }
+    if path.contains("..") {
+        return Err(format!(
+            "アイコンパスに '..' が含まれており、パストラバーサルの可能性があります: '{}'",
+            path
+        ));
+    }
+    if path.contains('\0') {
+        return Err("アイコンパスにNULバイトが含まれています".to_string());
+    }
+    Ok(())
+}
+
 #[command]
 pub async fn launch_steam_game(appid: String) -> Result<(), String> {
     println!("Command: launch_steam_game called with id: {}", appid);
+    // 不正改造防止: appid を Steam URI に組み込む前に数字のみか検証する
+    validate_appid(&appid)?;
     let url = format!("steam://run/{}", appid);
 
     // Use opener or direct command to launch URI scheme
@@ -173,6 +207,10 @@ fn find_icon_from_shortcuts(appid: &str) -> Option<String> {
                             for line in content.lines() {
                                 if line.starts_with("IconFile=") {
                                     let icon_path = line.trim_start_matches("IconFile=").trim();
+                                    // 不正改造防止: ショートカットファイルから取得したパスを検証する
+                                    if validate_icon_path(icon_path).is_err() {
+                                        continue;
+                                    }
                                     return Some(icon_path.to_string());
                                 }
                             }
@@ -284,6 +322,120 @@ pub async fn get_local_steam_image(appid: String) -> Result<Option<String>, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== [セキュリティ] validate_appid のテスト =====
+    // 要件: 不正改造 - Steam URI スキームへの不正な文字混入防止
+
+    #[test]
+    fn test_valid_appid_accepted() {
+        // 正規の数字のみ AppID は通過すること
+        for id in &["440", "730", "1234567890"] {
+            assert!(
+                validate_appid(id).is_ok(),
+                "正規のAppID '{}' は検証を通過すべき",
+                id
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_appid_rejected() {
+        assert!(validate_appid("").is_err(), "空のAppIDはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_appid_with_path_traversal_rejected() {
+        // 攻撃例: ../../etc/passwd のようなパス混入
+        let malicious = "440/../../../etc/passwd";
+        let result = validate_appid(malicious);
+        assert!(
+            result.is_err(),
+            "スラッシュ入りAppIDはURIインジェクション防止のためエラーを返すべき: '{}'",
+            malicious
+        );
+    }
+
+    #[test]
+    fn test_appid_with_uri_injection_rejected() {
+        // 攻撃例: steam://run/ を抜けて別URIを注入
+        let malicious = "440/open/main";
+        let result = validate_appid(malicious);
+        assert!(
+            result.is_err(),
+            "スラッシュを含むAppIDはURIインジェクション防止のためエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_appid_with_protocol_injection_rejected() {
+        // 攻撃例: URL に別のプロトコル（javascript: 等）を混入
+        let malicious = "440%0ajavascript:alert(1)";
+        let result = validate_appid(malicious);
+        assert!(result.is_err(), "パーセントエンコードを含むAppIDはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_appid_with_spaces_rejected() {
+        let result = validate_appid("440 && calc.exe");
+        assert!(result.is_err(), "スペースを含むAppIDはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_appid_negative_number_rejected() {
+        // マイナス符号は数字ではない
+        let result = validate_appid("-440");
+        assert!(result.is_err(), "負の数のAppIDはエラーを返すべき");
+    }
+
+    // ===== [セキュリティ] validate_icon_path のテスト =====
+    // 要件: 不正改造 - ショートカットファイル経由のパストラバーサル防止
+
+    #[test]
+    fn test_valid_icon_path_accepted() {
+        // 正規のアイコンパスは通過すること
+        let valid = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\game\\icon.ico";
+        assert!(
+            validate_icon_path(valid).is_ok(),
+            "正規のアイコンパス '{}' は検証を通過すべき",
+            valid
+        );
+    }
+
+    #[test]
+    fn test_icon_path_with_traversal_rejected() {
+        // 攻撃例: 悪意のある .url ファイルに IconFile=..\..\Windows\System32\cmd.exe を記載
+        let malicious = "C:\\Steam\\..\\..\\Windows\\System32\\cmd.exe";
+        let result = validate_icon_path(malicious);
+        assert!(
+            result.is_err(),
+            "'..' を含むアイコンパスはパストラバーサル防止のためエラーを返すべき: '{}'",
+            malicious
+        );
+    }
+
+    #[test]
+    fn test_icon_path_with_relative_traversal_rejected() {
+        // 攻撃例: 相対パストラバーサル
+        let malicious = "..\\..\\..\\sensitive\\data.txt";
+        let result = validate_icon_path(malicious);
+        assert!(result.is_err(), "相対パストラバーサルはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_icon_path_empty_rejected() {
+        assert!(validate_icon_path("").is_err(), "空のアイコンパスはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_icon_path_with_null_byte_rejected() {
+        // 攻撃例: NULバイトでパスを切り詰める（Null Byte Injection）
+        let malicious = "C:\\safe\\path.ico\0C:\\evil\\malware.exe";
+        let result = validate_icon_path(malicious);
+        assert!(
+            result.is_err(),
+            "NULバイトを含むアイコンパスはNullバイトインジェクション防止のためエラーを返すべき"
+        );
+    }
 
     // ===== extract_value のテスト =====
 

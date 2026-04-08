@@ -144,7 +144,30 @@ pub(crate) fn parse_powershell_output(stdout: &str, exit_success: bool) -> std::
     Ok(())
 }
 
+/// device_id に PowerShell インジェクション可能な文字が含まれていないか検証する（純粋関数）
+pub fn validate_device_id(id: &str) -> std::result::Result<(), String> {
+    if id.is_empty() {
+        return Err("デバイスIDが空です".to_string());
+    }
+    // PowerShell スクリプトに直接埋め込むため、メタ文字を禁止する
+    // Windows オーディオデバイスIDの正当な形式: {0.0.0.00000000}.{GUID} または {GUID}
+    let forbidden: &[char] = &['\'', '"', ';', '&', '|', '$', '`', '(', ')', '\n', '\r', '<', '>'];
+    for ch in forbidden {
+        if id.contains(*ch) {
+            return Err(format!(
+                "デバイスIDに不正な文字が含まれています: '{}' (PowerShellインジェクションの可能性)",
+                ch
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn set_default_device(device_id: String) -> Result<()> {
+    // 実行前にデバイスIDを検証してコマンドインジェクションを防止する
+    validate_device_id(&device_id)
+        .map_err(|e| Error::new(E_FAIL, e))?;
+
     // PowerShell script using the documented PolicyConfig COM object interface
     // Note: Escaping {{ and }} for format! macro
     let script = format!(
@@ -456,6 +479,105 @@ pub fn toggle_browser_mute() -> std::result::Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== [セキュリティ] validate_device_id のテスト =====
+    // 要件: 実行権限 - PowerShell コマンドインジェクション防止
+
+    #[test]
+    fn test_valid_device_id_accepted() {
+        // 正規の Windows オーディオデバイスID形式は通過すること
+        let valid_ids = [
+            "{0.0.0.00000000}.{12345678-1234-1234-1234-123456789abc}",
+            "{0.0.1.00000000}.{abcdef12-abcd-abcd-abcd-abcdef123456}",
+            "{12345678-1234-1234-1234-123456789abc}",
+        ];
+        for id in &valid_ids {
+            assert!(
+                validate_device_id(id).is_ok(),
+                "正規のデバイスID '{}' は検証を通過すべき",
+                id
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_device_id_rejected() {
+        let result = validate_device_id("");
+        assert!(result.is_err(), "空のデバイスIDはエラーを返すべき");
+        assert!(result.unwrap_err().contains("空"));
+    }
+
+    #[test]
+    fn test_injection_via_single_quote_rejected() {
+        // 攻撃例: $id = 'VALID_ID'; Remove-Item C:\important\file.txt; '
+        let malicious = "'; Remove-Item C:\\Windows\\System32; '";
+        let result = validate_device_id(malicious);
+        assert!(
+            result.is_err(),
+            "シングルクォートを含むデバイスIDはインジェクション防止のためエラーを返すべき: '{}'",
+            malicious
+        );
+    }
+
+    #[test]
+    fn test_injection_via_semicolon_rejected() {
+        // 攻撃例: セミコロンで複数コマンドを連結
+        let malicious = "device-id; Start-Process calc.exe";
+        let result = validate_device_id(malicious);
+        assert!(
+            result.is_err(),
+            "セミコロンを含むデバイスIDはインジェクション防止のためエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_injection_via_dollar_sign_rejected() {
+        // 攻撃例: PowerShell 変数展開 $env:USERNAME
+        let malicious = "device-id-$(whoami)";
+        let result = validate_device_id(malicious);
+        assert!(
+            result.is_err(),
+            "ドル記号を含むデバイスIDはインジェクション防止のためエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_injection_via_pipe_rejected() {
+        // 攻撃例: パイプでコマンド出力を別コマンドに渡す
+        let malicious = "device-id | Out-File C:\\leaked.txt";
+        let result = validate_device_id(malicious);
+        assert!(result.is_err(), "パイプを含むデバイスIDはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_injection_via_backtick_rejected() {
+        // 攻撃例: PowerShell バッククォートでのコマンド実行
+        let malicious = "device-id`nStart-Process malware.exe";
+        let result = validate_device_id(malicious);
+        assert!(
+            result.is_err(),
+            "バッククォートを含むデバイスIDはエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_injection_via_newline_rejected() {
+        // 攻撃例: 改行で新しいPowerShellコマンドを挿入
+        let malicious = "device-id\nRemove-Item C:\\critical.txt";
+        let result = validate_device_id(malicious);
+        assert!(
+            result.is_err(),
+            "改行を含むデバイスIDはコマンドインジェクション防止のためエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_injection_via_ampersand_rejected() {
+        // 攻撃例: & でコマンド実行
+        let malicious = "device-id & calc.exe";
+        let result = validate_device_id(malicious);
+        assert!(result.is_err(), "アンパサンドを含むデバイスIDはエラーを返すべき");
+    }
 
     // ===== parse_powershell_output のテスト =====
 

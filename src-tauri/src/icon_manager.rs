@@ -19,6 +19,26 @@ fn parse_icons_content(content: &str) -> Result<HashMap<String, String>, String>
         .map_err(|e| format!("カスタムアイコンのJSONパースに失敗しました: {}", e))
 }
 
+/// ファイルパスがパストラバーサル攻撃を含んでいないか検証する（テスト可能な純粋関数）
+/// 要件: 不正改造 - 任意ファイルの読み取りを防止する
+fn validate_file_path(path: &str) -> Result<(), String> {
+    if path.is_empty() {
+        return Err("ファイルパスが空です".to_string());
+    }
+    // パストラバーサル攻撃の検出 (../../etc/passwd 等)
+    if path.contains("..") {
+        return Err(format!(
+            "ファイルパスに '..' が含まれており、パストラバーサルの可能性があります: '{}'",
+            path
+        ));
+    }
+    // NULバイトインジェクションの検出
+    if path.contains('\0') {
+        return Err("ファイルパスにNULバイトが含まれています".to_string());
+    }
+    Ok(())
+}
+
 /// アイコンファイルのバイト列を検証する（テスト可能な純粋関数）
 fn validate_icon_file(data: &[u8]) -> Result<(), String> {
     if data.is_empty() {
@@ -66,6 +86,9 @@ pub async fn save_custom_icon_from_path(
     appid: String,
     file_path: String,
 ) -> Result<(), String> {
+    // 不正改造防止: ファイルパスを読み込む前にパストラバーサルを検証する
+    validate_file_path(&file_path)?;
+
     let file_data = fs::read(&file_path).map_err(|e| format!("ファイル読み込みに失敗しました: {}", e))?;
 
     // 修正: 空ファイル・サイズ超過を検証してエラーを返す
@@ -89,6 +112,98 @@ pub async fn save_custom_icon_from_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== [セキュリティ] validate_file_path のテスト =====
+    // 要件: 不正改造 - アイコン保存時の任意ファイル読み取り（パストラバーサル）防止
+
+    #[test]
+    fn test_valid_file_path_accepted() {
+        // 正規のファイルパスは通過すること
+        let valid_paths = [
+            "C:\\Users\\user\\Desktop\\icon.png",
+            "C:\\Users\\user\\Pictures\\game_icon.jpg",
+            "D:\\icons\\custom.webp",
+        ];
+        for path in &valid_paths {
+            assert!(
+                validate_file_path(path).is_ok(),
+                "正規のパス '{}' は検証を通過すべき",
+                path
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_path_rejected() {
+        assert!(validate_file_path("").is_err(), "空のパスはエラーを返すべき");
+    }
+
+    #[test]
+    fn test_path_traversal_windows_backslash_rejected() {
+        // 攻撃例: ..\..\ を使ったWindowsパストラバーサル
+        let malicious = "C:\\Users\\user\\..\\..\\Windows\\System32\\config\\SAM";
+        let result = validate_file_path(malicious);
+        assert!(
+            result.is_err(),
+            "'..' を含むパスはパストラバーサル防止のためエラーを返すべき: '{}'",
+            malicious
+        );
+        assert!(result.unwrap_err().contains(".."));
+    }
+
+    #[test]
+    fn test_path_traversal_unix_slash_rejected() {
+        // 攻撃例: ../../ を使ったUnix形式パストラバーサル
+        let malicious = "../../etc/passwd";
+        let result = validate_file_path(malicious);
+        assert!(
+            result.is_err(),
+            "Unix形式のパストラバーサルもエラーを返すべき: '{}'",
+            malicious
+        );
+    }
+
+    #[test]
+    fn test_path_with_dotdot_in_filename_rejected() {
+        // 攻撃例: ファイル名の途中に .. が含まれるケース
+        let malicious = "C:\\icons\\icon..\\..\\..\\sensitive.png";
+        let result = validate_file_path(malicious);
+        assert!(result.is_err(), "パスの途中に '..' を含む場合もエラーを返すべき");
+    }
+
+    #[test]
+    fn test_path_with_null_byte_rejected() {
+        // 攻撃例: NULバイトインジェクション
+        // C言語の文字列終端文字 \0 でパスを切り詰める攻撃
+        let malicious = "C:\\safe\\icon.png\0C:\\Windows\\System32\\evil.exe";
+        let result = validate_file_path(malicious);
+        assert!(
+            result.is_err(),
+            "NULバイトを含むパスはNullバイトインジェクション防止のためエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_system_file_path_with_traversal_rejected() {
+        // 攻撃例: Windowsのパスワードハッシュファイルへのアクセス試行
+        let malicious = "C:\\Users\\user\\Desktop\\..\\..\\Windows\\System32\\config\\SAM";
+        let result = validate_file_path(malicious);
+        assert!(
+            result.is_err(),
+            "システムファイルへのパストラバーサルはエラーを返すべき"
+        );
+    }
+
+    #[test]
+    fn test_ssh_key_path_with_traversal_rejected() {
+        // 攻撃例: SSHプライベートキーへのアクセス試行
+        let malicious = "C:\\Users\\user\\Desktop\\..\\..\\..ssh\\id_rsa";
+        let result = validate_file_path(malicious);
+        assert!(
+            result.is_err(),
+            "SSHキーへのパストラバーサルはエラーを返すべき"
+        );
+    }
 
     // ===== parse_icons_content のテスト =====
 
