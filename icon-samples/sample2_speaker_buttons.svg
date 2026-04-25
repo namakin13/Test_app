@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <radialGradient id="cone2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg2)"/>
+
+  <!-- Speaker outer cone (large circle) -->
+  <circle cx="256" cy="256" r="170" fill="#1f2937" stroke="#f8fafc" stroke-width="8"/>
+
+  <!-- Speaker inner cone -->
+  <circle cx="256" cy="256" r="130" fill="url(#cone2)"/>
+
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="95" fill="#1f2937" stroke="#f8fafc" stroke-width="4"/>
+
+  <!-- Controller buttons arranged like speaker dust cap -->
+  <g transform="translate(256 256)">
+    <!-- Top -->
+    <circle cx="0" cy="-50" r="22" fill="#fbbf24" stroke="#f8fafc" stroke-width="4"/>
+    <text x="0" y="-43" text-anchor="middle" font-family="Arial Black" font-size="22" fill="#1f2937">Y</text>
+    <!-- Left -->
+    <circle cx="-50" cy="0" r="22" fill="#3b82f6" stroke="#f8fafc" stroke-width="4"/>
+    <text x="-50" y="7" text-anchor="middle" font-family="Arial Black" font-size="22" fill="#f8fafc">X</text>
+    <!-- Right -->
+    <circle cx="50" cy="0" r="22" fill="#ef4444" stroke="#f8fafc" stroke-width="4"/>
+    <text x="50" y="7" text-anchor="middle" font-family="Arial Black" font-size="22" fill="#f8fafc">B</text>
+    <!-- Bottom -->
+    <circle cx="0" cy="50" r="22" fill="#10b981" stroke="#f8fafc" stroke-width="4"/>
+    <text x="0" y="57" text-anchor="middle" font-family="Arial Black" font-size="22" fill="#f8fafc">A</text>
+  </g>
+
+  <!-- Sound waves emanating from speaker -->
+  <g stroke="#fde68a" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.9">
+    <path d="M 70 256 Q 50 200 70 144"/>
+    <path d="M 442 256 Q 462 200 442 144"/>
+    <path d="M 256 70 Q 200 50 144 70"/>
+    <path d="M 256 442 Q 200 462 144 442"/>
+  </g>
+</svg>
