@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface AudioDevice {
@@ -12,6 +12,7 @@ export const useAudio = () => {
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [volume, setVolumeState] = useState<number>(0);
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -21,7 +22,6 @@ export const useAudio = () => {
       setDevices(result);
     } catch (err) {
       console.error("Failed to fetch devices:", err);
-      // 修正: エラーを error ステートに格納してUIに伝播できるようにする
       setError(String(err));
     } finally {
       setLoading(false);
@@ -37,12 +37,40 @@ export const useAudio = () => {
       await fetchDevices();
     } catch (err) {
       console.error("Failed to switch device:", err);
-      // 修正: エラーを error ステートに格納してUIに伝播できるようにする
       setError(String(err));
     } finally {
       setSwitching(null);
     }
   };
 
-  return { devices, loading, switching, error, fetchDevices, switchDevice };
+  const fetchVolume = useCallback(async (id: string) => {
+    try {
+      const level: number = await invoke("get_device_volume", { id });
+      setVolumeState(Math.round(level * 100));
+    } catch (err) {
+      console.error("Failed to fetch volume:", err);
+    }
+  }, []);
+
+  // スライダー操作中の即時反映用。値はパーセント(0-100)。
+  const setVolume = useCallback(async (id: string, percent: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    setVolumeState(clamped);
+    try {
+      await invoke("set_device_volume", { id, level: clamped / 100 });
+    } catch (err) {
+      console.error("Failed to set volume:", err);
+    }
+  }, []);
+
+  // デフォルトデバイスが変わったら音量を取り直す
+  const defaultId = devices.find((d) => d.is_default)?.id ?? null;
+  useEffect(() => {
+    if (defaultId) fetchVolume(defaultId);
+  }, [defaultId, fetchVolume]);
+
+  return {
+    devices, loading, switching, error, volume,
+    fetchDevices, switchDevice, fetchVolume, setVolume,
+  };
 };

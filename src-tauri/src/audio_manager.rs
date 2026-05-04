@@ -350,6 +350,50 @@ pub fn switch_audio_device(id: String) -> std::result::Result<(), String> {
     })
 }
 
+// ===== デバイス音量取得・設定 =====
+use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+
+/// 指定IDのオーディオデバイスからマスター音量(0.0〜1.0)を取得する
+fn get_device_volume_internal(device_id: &str) -> Result<f32> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let id_wide: Vec<u16> = device_id.encode_utf16().chain(std::iter::once(0)).collect();
+        let device = enumerator.GetDevice(PCWSTR(id_wide.as_ptr()))?;
+        let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+        let level = endpoint_volume.GetMasterVolumeLevelScalar()?;
+        Ok(level)
+    }
+}
+
+/// 指定IDのオーディオデバイスにマスター音量(0.0〜1.0)を設定する
+fn set_device_volume_internal(device_id: &str, level: f32) -> Result<()> {
+    let level = level.clamp(0.0, 1.0);
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let id_wide: Vec<u16> = device_id.encode_utf16().chain(std::iter::once(0)).collect();
+        let device = enumerator.GetDevice(PCWSTR(id_wide.as_ptr()))?;
+        let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+        endpoint_volume.SetMasterVolumeLevelScalar(level, std::ptr::null())?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+pub fn get_device_volume(id: String) -> std::result::Result<f32, String> {
+    get_device_volume_internal(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_device_volume(id: String, level: f32) -> std::result::Result<(), String> {
+    set_device_volume_internal(&id, level).map_err(|e| e.to_string())
+}
+
 // ===== メディアキー送信 =====
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP,

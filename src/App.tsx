@@ -13,7 +13,10 @@ import "./index.css";
 function App() {
   const [activeTab, setActiveTab] = React.useState<"audio" | "games">("audio");
 
-  const { devices, loading: audioLoading, switching, fetchDevices, switchDevice } = useAudio();
+  const {
+    devices, loading: audioLoading, switching, volume,
+    fetchDevices, switchDevice, setVolume,
+  } = useAudio();
   const {
     games, loading: gamesLoading, hasFetched, launching, launchingSteam,
     customIcons, fetchAll, fetchGames, launchGame, launchSteam, saveCustomIcon,
@@ -181,17 +184,40 @@ function App() {
                           className={`device-item ${device.is_default ? "active" : ""}`}
                           onClick={() => switchDevice(device.id)}
                         >
-                          <div className="device-info">
-                            <div className="device-icon">
-                              {switching === device.id ? (
-                                <Loader2 size={20} className="animate-spin" />
-                              ) : (
-                                getAudioIcon(device.name)
-                              )}
+                          <div className="device-row">
+                            <div className="device-info">
+                              <div className="device-icon">
+                                {switching === device.id ? (
+                                  <Loader2 size={20} className="animate-spin" />
+                                ) : (
+                                  getAudioIcon(device.name)
+                                )}
+                              </div>
+                              <span className="device-name">{device.name}</span>
                             </div>
-                            <span className="device-name">{device.name}</span>
+                            <div className="status-dot"></div>
                           </div>
-                          <div className="status-dot"></div>
+                          {device.is_default && (
+                            <div
+                              className="volume-control"
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                            >
+                              <Volume2 size={16} />
+                              <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={volume}
+                                onChange={(e) => setVolume(device.id, parseInt(e.target.value, 10))}
+                                className="volume-slider"
+                                style={{ ["--volume-fill" as string]: `${volume}%` }}
+                                aria-label="音量"
+                              />
+                              <span className="volume-value">{volume}%</span>
+                            </div>
+                          )}
                         </motion.div>
                       ))
                     ) : (

@@ -6,8 +6,8 @@ mod icon_manager;
 mod steam_manager;
 
 use audio_manager::{
-    get_audio_devices, media_next, media_play_pause, media_prev, switch_audio_device,
-    toggle_browser_mute,
+    get_audio_devices, get_device_volume, media_next, media_play_pause, media_prev,
+    set_device_volume, switch_audio_device, toggle_browser_mute,
 };
 use icon_manager::{get_custom_icons, save_custom_icon, save_custom_icon_from_path};
 use steam_manager::{get_local_steam_image, get_steam_games, launch_steam_app, launch_steam_game};
@@ -18,6 +18,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_audio_devices,
             switch_audio_device,
+            get_device_volume,
+            set_device_volume,
             media_play_pause,
             media_next,
             media_prev,
