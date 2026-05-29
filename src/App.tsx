@@ -1,17 +1,19 @@
 import React, { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { invoke } from "@tauri-apps/api/core";
-import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones, SkipBack, Play, SkipForward, VolumeX } from "lucide-react";
+import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones, SkipBack, Play, SkipForward, VolumeX, Plus, X } from "lucide-react";
 import { Icon } from "@iconify/react";
 import steamIcon from "@iconify-icons/simple-icons/steam";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameBanner } from "./components/GameBanner";
 import { useAudio } from "./hooks/useAudio";
 import { useSteam } from "./hooks/useSteam";
+import { useManualGames } from "./hooks/useManualGames";
 import "./index.css";
 
 function App() {
   const [activeTab, setActiveTab] = React.useState<"audio" | "games">("audio");
+  const [gameSubTab, setGameSubTab] = React.useState<"steam" | "other">("steam");
 
   const {
     devices, loading: audioLoading, switching, volume,
@@ -21,6 +23,10 @@ function App() {
     games, loading: gamesLoading, hasFetched, launching, launchingSteam,
     customIcons, fetchAll, fetchGames, launchGame, launchSteam, saveCustomIcon,
   } = useSteam();
+  const {
+    games: manualGames, loading: manualLoading, launching: manualLaunching,
+    fetchManualGames, addManualGameViaDialog, removeManualGame, launchManualGame,
+  } = useManualGames();
 
   const [browserMuted, setBrowserMuted] = React.useState(false);
   const hoveredGameIdRef = React.useRef<string | null>(null);
@@ -66,6 +72,7 @@ function App() {
   useEffect(() => {
     if (activeTab === "games" && !hasFetched) {
       fetchAll();
+      fetchManualGames();
     }
   }, [activeTab, hasFetched]);
 
@@ -112,10 +119,33 @@ function App() {
 
         <button
           className="refresh-button"
-          onClick={activeTab === "audio" ? fetchDevices : fetchGames}
-          disabled={activeTab === "audio" ? audioLoading : gamesLoading}
+          onClick={
+            activeTab === "audio"
+              ? fetchDevices
+              : gameSubTab === "steam"
+              ? fetchGames
+              : fetchManualGames
+          }
+          disabled={
+            activeTab === "audio"
+              ? audioLoading
+              : gameSubTab === "steam"
+              ? gamesLoading
+              : manualLoading
+          }
         >
-          <RotateCw size={18} className={(activeTab === "audio" ? audioLoading : gamesLoading) ? "animate-spin" : ""} />
+          <RotateCw
+            size={18}
+            className={
+              (activeTab === "audio"
+                ? audioLoading
+                : gameSubTab === "steam"
+                ? gamesLoading
+                : manualLoading)
+                ? "animate-spin"
+                : ""
+            }
+          />
         </button>
       </header>
 
@@ -236,39 +266,116 @@ function App() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {gamesLoading ? (
+              <div className="sub-tabs">
+                <button
+                  className={`sub-tab ${gameSubTab === "steam" ? "active" : ""}`}
+                  onClick={() => setGameSubTab("steam")}
+                >
+                  <Icon icon={steamIcon} width="16" height="16" />
+                  Steam
+                </button>
+                <button
+                  className={`sub-tab ${gameSubTab === "other" ? "active" : ""}`}
+                  onClick={() => setGameSubTab("other")}
+                >
+                  <Gamepad2 size={16} />
+                  その他
+                </button>
+              </div>
+
+              {gameSubTab === "steam" ? (
+                gamesLoading ? (
+                  <div className="loading-container">
+                    <div className="spinner"></div>
+                    <p className="loading-text">Loading Steam library...</p>
+                  </div>
+                ) : (
+                  <div className="game-list">
+                    <AnimatePresence mode="popLayout">
+                      {games.length > 0 ? (
+                        games.map((game) => (
+                          <motion.div
+                            key={game.appid}
+                            layout
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className="game-card"
+                            onClick={() => launchGame(game.appid)}
+                            onMouseEnter={() => { hoveredGameIdRef.current = game.appid; }}
+                            onMouseLeave={() => { if (hoveredGameIdRef.current === game.appid) hoveredGameIdRef.current = null; }}
+                            title={game.name}
+                          >
+                            <GameBanner game={game} customIcon={customIcons[game.appid]} />
+                            {launching === game.appid && (
+                              <div className="game-launching-overlay">
+                                <Loader2 size={24} className="animate-spin" />
+                              </div>
+                            )}
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="no-items">No Steam games found.</div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              ) : manualLoading ? (
                 <div className="loading-container">
                   <div className="spinner"></div>
-                  <p className="loading-text">Loading Steam library...</p>
+                  <p className="loading-text">Loading games...</p>
                 </div>
               ) : (
                 <div className="game-list">
                   <AnimatePresence mode="popLayout">
-                    {games.length > 0 ? (
-                      games.map((game) => (
-                        <motion.div
-                          key={game.appid}
-                          layout
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          className="game-card"
-                          onClick={() => launchGame(game.appid)}
-                          onMouseEnter={() => { hoveredGameIdRef.current = game.appid; }}
-                          onMouseLeave={() => { if (hoveredGameIdRef.current === game.appid) hoveredGameIdRef.current = null; }}
-                          title={game.name}
+                    {manualGames.map((game) => (
+                      <motion.div
+                        key={game.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="game-card"
+                        onClick={() => launchManualGame(game.id)}
+                        onMouseEnter={() => { hoveredGameIdRef.current = game.id; }}
+                        onMouseLeave={() => { if (hoveredGameIdRef.current === game.id) hoveredGameIdRef.current = null; }}
+                        title={game.name}
+                      >
+                        <GameBanner
+                          game={{ name: game.name, appid: game.id, header_image_url: "" }}
+                          customIcon={customIcons[game.id]}
+                          manual
+                        />
+                        <button
+                          className="game-remove-button"
+                          title="削除"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeManualGame(game.id);
+                          }}
                         >
-                          <GameBanner game={game} customIcon={customIcons[game.appid]} />
-                          {launching === game.appid && (
-                            <div className="game-launching-overlay">
-                              <Loader2 size={24} className="animate-spin" />
-                            </div>
-                          )}
-                        </motion.div>
-                      ))
-                    ) : (
-                      <div className="no-items">No Steam games found.</div>
-                    )}
+                          <X size={14} />
+                        </button>
+                        {manualLaunching === game.id && (
+                          <div className="game-launching-overlay">
+                            <Loader2 size={24} className="animate-spin" />
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                    {/* 追加カード */}
+                    <motion.div
+                      key="__add_manual__"
+                      layout
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="game-card game-add-card"
+                      onClick={addManualGameViaDialog}
+                      title="ゲームを追加"
+                    >
+                      <Plus size={36} opacity={0.5} />
+                    </motion.div>
                   </AnimatePresence>
                 </div>
               )}

@@ -3,6 +3,7 @@
 
 mod audio_manager;
 mod icon_manager;
+mod manual_game_manager;
 mod steam_manager;
 
 use audio_manager::{
@@ -10,11 +11,15 @@ use audio_manager::{
     set_device_volume, switch_audio_device, toggle_browser_mute,
 };
 use icon_manager::{get_custom_icons, save_custom_icon, save_custom_icon_from_path};
+use manual_game_manager::{
+    add_manual_game, get_manual_games, launch_manual_game, remove_manual_game,
+};
 use steam_manager::{get_local_steam_image, get_steam_games, launch_steam_app, launch_steam_game};
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_audio_devices,
             switch_audio_device,
@@ -30,7 +35,11 @@ fn main() {
             get_custom_icons,
             save_custom_icon,
             save_custom_icon_from_path,
-            get_local_steam_image
+            get_local_steam_image,
+            get_manual_games,
+            add_manual_game,
+            remove_manual_game,
+            launch_manual_game
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
