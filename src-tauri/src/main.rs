@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio_manager;
+mod exe_icon;
 mod icon_manager;
 mod manual_game_manager;
 mod steam_manager;
@@ -10,6 +11,7 @@ use audio_manager::{
     get_audio_devices, get_device_volume, media_next, media_play_pause, media_prev,
     set_device_volume, switch_audio_device, toggle_browser_mute,
 };
+use exe_icon::get_exe_icon;
 use icon_manager::{get_custom_icons, save_custom_icon, save_custom_icon_from_path};
 use manual_game_manager::{
     add_manual_game, get_manual_games, launch_manual_game, remove_manual_game,
@@ -39,7 +41,8 @@ fn main() {
             get_manual_games,
             add_manual_game,
             remove_manual_game,
-            launch_manual_game
+            launch_manual_game,
+            get_exe_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

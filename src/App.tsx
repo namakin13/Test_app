@@ -344,6 +344,7 @@ function App() {
                         <GameBanner
                           game={{ name: game.name, appid: game.id, header_image_url: "" }}
                           customIcon={customIcons[game.id]}
+                          exePath={game.exe_path}
                           manual
                         />
                         <button

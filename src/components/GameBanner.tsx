@@ -13,10 +13,13 @@ interface GameBannerProps {
   customIcon?: string;
   /** Steam以外の手動追加ゲームの場合 true。CDN/ローカルキャッシュ取得を行わない */
   manual?: boolean;
+  /** 手動ゲームの実行ファイルパス。exeアイコンの抽出に使用 */
+  exePath?: string;
 }
 
-export const GameBanner = ({ game, customIcon, manual = false }: GameBannerProps) => {
+export const GameBanner = ({ game, customIcon, manual = false, exePath }: GameBannerProps) => {
   const [localCacheImg, setLocalCacheImg] = useState<string | null>(null);
+  const [exeIcon, setExeIcon] = useState<string | null>(null);
 
   useEffect(() => {
     // 手動ゲームには Steam のローカルキャッシュ画像は存在しないため取得しない
@@ -31,17 +34,33 @@ export const GameBanner = ({ game, customIcon, manual = false }: GameBannerProps
       .catch(console.error);
   }, [game.appid, manual]);
 
+  useEffect(() => {
+    // 手動ゲームは実行ファイルからアイコンを抽出する
+    if (!manual || !exePath) {
+      setExeIcon(null);
+      return;
+    }
+    invoke<string | null>("get_exe_icon", { exePath })
+      .then(res => {
+        if (res) setExeIcon(res);
+      })
+      .catch(console.error);
+  }, [manual, exePath]);
+
   // 正方形アイコン向けフォールバックチェーン:
   //   1. カスタムアイコン（ユーザー設定）
   //   2. ローカルキャッシュ（library_600x900.jpg → header.jpg → {hash}.jpg の順）
   //   3. CDN library_600x900.jpg（縦長＝正方形トリミングに最適）
   //   4. CDN header.jpg（DLC・ツール等で portrait がない場合の保険）
-  // 手動ゲームは Steam CDN を持たないため、カスタムアイコンのみ（なければプレースホルダ）
+  // 手動ゲームは Steam CDN を持たないため、カスタムアイコン → 抽出したexeアイコン → プレースホルダ
   const cdnPortrait = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/library_600x900.jpg`;
   const cdnHeader = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`;
 
   const fallbacks = manual
-    ? (customIcon ? [customIcon] : [])
+    ? [
+        ...(customIcon ? [customIcon] : []),
+        ...(exeIcon ? [exeIcon] : []),
+      ]
     : customIcon
     ? [customIcon, ...(localCacheImg ? [localCacheImg] : []), cdnPortrait, cdnHeader]
     : [...(localCacheImg ? [localCacheImg] : []), cdnPortrait, cdnHeader];
@@ -52,7 +71,10 @@ export const GameBanner = ({ game, customIcon, manual = false }: GameBannerProps
   useEffect(() => {
     setImgIndex(0);
     setIsError(fallbacks.length === 0);
-  }, [game.appid, customIcon, localCacheImg, manual]);
+  }, [game.appid, customIcon, localCacheImg, exeIcon, manual]);
+
+  // 手動ゲームのアイコンは正方形なので、トリミングせず全体を表示する（contain）
+  const imgClassName = manual && !customIcon ? "game-banner game-banner--contain" : "game-banner";
 
   return (
     <div className="game-banner-container">
@@ -60,7 +82,7 @@ export const GameBanner = ({ game, customIcon, manual = false }: GameBannerProps
         <img
           src={fallbacks[imgIndex]}
           alt={game.name}
-          className="game-banner"
+          className={imgClassName}
           style={isError ? { display: 'none' } : undefined}
           onError={() => {
             if (imgIndex < fallbacks.length - 1) {

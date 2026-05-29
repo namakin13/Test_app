@@ -356,6 +356,13 @@ body {
   transition: opacity 0.3s ease;
 }
 
+/* exeから抽出した正方形アイコン用：トリミングせず余白を付けて全体表示 */
+.game-banner--contain {
+  object-fit: contain;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
 .game-banner-fallback {
   position: absolute;
   top: 0;
