@@ -22,7 +22,7 @@ describe("useManualGames", () => {
   describe("fetchManualGames", () => {
     it("成功時: games が更新され loading が false になる", async () => {
       const mockGames = [
-        { id: "manual_1", name: "My Game", exe_path: "C:\\Games\\g.exe" },
+        { id: "manual_1", name: "My Game", exe_path: "C:\\Games\\g.exe", category: "game" },
       ];
       mockInvoke.mockResolvedValueOnce(mockGames);
 
@@ -53,7 +53,7 @@ describe("useManualGames", () => {
   // ===== addManualGameViaDialog =====
 
   describe("addManualGameViaDialog", () => {
-    it("ファイル選択後: ファイル名を初期名として add_manual_game を呼び再取得する", async () => {
+    it("ファイル選択後: ファイル名を初期名として add_manual_game を呼び再取得する（既定はgame）", async () => {
       mockOpen.mockResolvedValueOnce("C:\\Games\\Cool Game.exe");
       mockInvoke.mockResolvedValueOnce(undefined); // add_manual_game
       mockInvoke.mockResolvedValueOnce([]);        // fetchManualGames
@@ -67,6 +67,25 @@ describe("useManualGames", () => {
       expect(mockInvoke).toHaveBeenCalledWith("add_manual_game", {
         name: "Cool Game",
         exePath: "C:\\Games\\Cool Game.exe",
+        category: "game",
+      });
+    });
+
+    it("category=app を指定するとアプリとして add_manual_game を呼ぶ", async () => {
+      mockOpen.mockResolvedValueOnce("C:\\Apps\\Discord.exe");
+      mockInvoke.mockResolvedValueOnce(undefined); // add_manual_game
+      mockInvoke.mockResolvedValueOnce([]);        // fetchManualGames
+
+      const { result } = renderHook(() => useManualGames());
+
+      await act(async () => {
+        await result.current.addManualGameViaDialog("app");
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith("add_manual_game", {
+        name: "Discord",
+        exePath: "C:\\Apps\\Discord.exe",
+        category: "app",
       });
     });
 

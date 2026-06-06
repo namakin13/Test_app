@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { invoke } from "@tauri-apps/api/core";
-import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones, SkipBack, Play, SkipForward, VolumeX, Plus, X } from "lucide-react";
+import { Volume2, Speaker, Headset, Loader2, RotateCw, Gamepad2, Headphones, SkipBack, Play, SkipForward, VolumeX, Plus, X, AppWindow } from "lucide-react";
 import { Icon } from "@iconify/react";
 import steamIcon from "@iconify-icons/simple-icons/steam";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,7 @@ import { useManualGames } from "./hooks/useManualGames";
 import "./index.css";
 
 function App() {
-  const [activeTab, setActiveTab] = React.useState<"audio" | "games">("audio");
+  const [activeTab, setActiveTab] = React.useState<"audio" | "games" | "apps">("audio");
   const [gameSubTab, setGameSubTab] = React.useState<"steam" | "other">("steam");
 
   const {
@@ -27,6 +27,28 @@ function App() {
     games: manualGames, loading: manualLoading, launching: manualLaunching,
     fetchManualGames, addManualGameViaDialog, removeManualGame, launchManualGame,
   } = useManualGames();
+
+  // 手動エントリを category で分離：game=Games>その他, app=アプリタブ
+  const manualGameItems = manualGames.filter((g) => g.category !== "app");
+  const manualAppItems = manualGames.filter((g) => g.category === "app");
+
+  // 更新ボタンのアクティブタブ別ハンドラ
+  const refreshHandler =
+    activeTab === "audio"
+      ? fetchDevices
+      : activeTab === "apps"
+      ? fetchManualGames
+      : gameSubTab === "steam"
+      ? fetchGames
+      : fetchManualGames;
+  const refreshLoading =
+    activeTab === "audio"
+      ? audioLoading
+      : activeTab === "apps"
+      ? manualLoading
+      : gameSubTab === "steam"
+      ? gamesLoading
+      : manualLoading;
 
   const [browserMuted, setBrowserMuted] = React.useState(false);
   const hoveredGameIdRef = React.useRef<string | null>(null);
@@ -76,6 +98,16 @@ function App() {
     }
   }, [activeTab, hasFetched]);
 
+  // アプリタブを初めて開いたとき、手動エントリ（とカスタムアイコン）を取得する
+  const [appsFetched, setAppsFetched] = React.useState(false);
+  useEffect(() => {
+    if (activeTab === "apps" && !appsFetched) {
+      setAppsFetched(true);
+      fetchManualGames();
+      if (!hasFetched) fetchAll(); // カスタムアイコン共有のため取得
+    }
+  }, [activeTab, appsFetched, hasFetched]);
+
   const getAudioIcon = (name: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes("headset") || lowerName.includes("headphones") || lowerName.includes("イヤホン")) return <Headset size={20} />;
@@ -115,36 +147,23 @@ function App() {
             <Gamepad2 size={18} />
             Games
           </button>
+          <button
+            className={`tab ${activeTab === "apps" ? "active" : ""}`}
+            onClick={() => setActiveTab("apps")}
+          >
+            <AppWindow size={18} />
+            アプリ
+          </button>
         </div>
 
         <button
           className="refresh-button"
-          onClick={
-            activeTab === "audio"
-              ? fetchDevices
-              : gameSubTab === "steam"
-              ? fetchGames
-              : fetchManualGames
-          }
-          disabled={
-            activeTab === "audio"
-              ? audioLoading
-              : gameSubTab === "steam"
-              ? gamesLoading
-              : manualLoading
-          }
+          onClick={refreshHandler}
+          disabled={refreshLoading}
         >
           <RotateCw
             size={18}
-            className={
-              (activeTab === "audio"
-                ? audioLoading
-                : gameSubTab === "steam"
-                ? gamesLoading
-                : manualLoading)
-                ? "animate-spin"
-                : ""
-            }
+            className={refreshLoading ? "animate-spin" : ""}
           />
         </button>
       </header>
@@ -258,7 +277,7 @@ function App() {
                 </>
               )}
             </motion.div>
-          ) : (
+          ) : activeTab === "games" ? (
             <motion.div
               key="games-tab"
               initial={{ opacity: 0, x: 20 }}
@@ -328,7 +347,7 @@ function App() {
               ) : (
                 <div className="game-list">
                   <AnimatePresence mode="popLayout">
-                    {manualGames.map((game) => (
+                    {manualGameItems.map((game) => (
                       <motion.div
                         key={game.id}
                         layout
@@ -366,14 +385,83 @@ function App() {
                     ))}
                     {/* 追加カード */}
                     <motion.div
-                      key="__add_manual__"
+                      key="__add_manual_game__"
                       layout
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="game-card game-add-card"
-                      onClick={addManualGameViaDialog}
+                      onClick={() => addManualGameViaDialog("game")}
                       title="ゲームを追加"
+                    >
+                      <Plus size={36} opacity={0.5} />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="apps-tab"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {manualLoading ? (
+                <div className="loading-container">
+                  <div className="spinner"></div>
+                  <p className="loading-text">Loading apps...</p>
+                </div>
+              ) : (
+                <div className="game-list">
+                  <AnimatePresence mode="popLayout">
+                    {manualAppItems.map((app) => (
+                      <motion.div
+                        key={app.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="game-card"
+                        onClick={() => launchManualGame(app.id)}
+                        onMouseEnter={() => { hoveredGameIdRef.current = app.id; }}
+                        onMouseLeave={() => { if (hoveredGameIdRef.current === app.id) hoveredGameIdRef.current = null; }}
+                        title={app.name}
+                      >
+                        <GameBanner
+                          game={{ name: app.name, appid: app.id, header_image_url: "" }}
+                          customIcon={customIcons[app.id]}
+                          exePath={app.exe_path}
+                          manual
+                        />
+                        <button
+                          className="game-remove-button"
+                          title="削除"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeManualGame(app.id);
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                        {manualLaunching === app.id && (
+                          <div className="game-launching-overlay">
+                            <Loader2 size={24} className="animate-spin" />
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                    {/* 追加カード */}
+                    <motion.div
+                      key="__add_manual_app__"
+                      layout
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="game-card game-add-card"
+                      onClick={() => addManualGameViaDialog("app")}
+                      title="アプリを追加"
                     >
                       <Plus size={36} opacity={0.5} />
                     </motion.div>

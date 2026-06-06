@@ -2,10 +2,13 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
+export type ManualCategory = "game" | "app";
+
 export interface ManualGame {
   id: string;
   name: string;
   exe_path: string;
+  category: ManualCategory;
 }
 
 export const useManualGames = () => {
@@ -28,8 +31,8 @@ export const useManualGames = () => {
     }
   };
 
-  /** ファイル選択ダイアログを開いて手動ゲームを追加する */
-  const addManualGameViaDialog = async () => {
+  /** ファイル選択ダイアログを開いて手動エントリ（ゲーム/アプリ）を追加する */
+  const addManualGameViaDialog = async (category: ManualCategory = "game") => {
     setError(null);
     try {
       const selected = await open({
@@ -48,6 +51,7 @@ export const useManualGames = () => {
       await invoke<ManualGame>("add_manual_game", {
         name: defaultName,
         exePath: selected,
+        category,
       });
       await fetchManualGames();
     } catch (err) {

@@ -4,11 +4,28 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
+/// カテゴリ未指定の古いエントリ（category追加前のJSON）は "game" 扱いにする
+fn default_category() -> String {
+    "game".to_string()
+}
+
+/// category 文字列を正規化する（"app" 以外はすべて "game" に丸める）
+fn normalize_category(category: &str) -> String {
+    if category == "app" {
+        "app".to_string()
+    } else {
+        "game".to_string()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct ManualGame {
     pub id: String,
     pub name: String,
     pub exe_path: String,
+    /// "game" = 非Steamゲーム（Games>その他）, "app" = 一般アプリ（アプリタブ）
+    #[serde(default = "default_category")]
+    pub category: String,
 }
 
 /// 手動ゲーム一覧の保存先パスを返す（app_data_dir/manual_games.json）
@@ -96,6 +113,7 @@ pub async fn add_manual_game(
     app_handle: AppHandle,
     name: String,
     exe_path: String,
+    category: String,
 ) -> Result<ManualGame, String> {
     // 不正改造防止: 保存前にパスを検証する
     validate_exe_path(&exe_path)?;
@@ -122,6 +140,7 @@ pub async fn add_manual_game(
         id: generate_id(),
         name: final_name,
         exe_path,
+        category: normalize_category(&category),
     };
     games.push(game.clone());
     write_manual_games(&app_handle, &games)?;
@@ -240,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_parse_valid_games_json() {
-        let json = r#"[{"id":"manual_1","name":"My Game","exe_path":"C:\\Games\\g.exe"}]"#;
+        let json = r#"[{"id":"manual_1","name":"My Game","exe_path":"C:\\Games\\g.exe","category":"game"}]"#;
         let result = parse_manual_games_content(json);
         assert!(result.is_ok());
         let games = result.unwrap();
@@ -248,6 +267,33 @@ mod tests {
         assert_eq!(games[0].id, "manual_1");
         assert_eq!(games[0].name, "My Game");
         assert_eq!(games[0].exe_path, "C:\\Games\\g.exe");
+        assert_eq!(games[0].category, "game");
+    }
+
+    #[test]
+    fn test_parse_legacy_json_without_category_defaults_to_game() {
+        // category 追加前に保存された古いJSON（categoryなし）も読めること
+        let json = r#"[{"id":"manual_1","name":"Old Entry","exe_path":"C:\\Games\\g.exe"}]"#;
+        let games = parse_manual_games_content(json).unwrap();
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].category, "game", "categoryなしの古いエントリは game 既定にすべき");
+    }
+
+    #[test]
+    fn test_parse_app_category_json() {
+        let json = r#"[{"id":"manual_2","name":"Discord","exe_path":"C:\\Apps\\Discord.exe","category":"app"}]"#;
+        let games = parse_manual_games_content(json).unwrap();
+        assert_eq!(games[0].category, "app");
+    }
+
+    #[test]
+    fn test_normalize_category() {
+        assert_eq!(normalize_category("app"), "app");
+        assert_eq!(normalize_category("game"), "game");
+        // 未知の値・空文字は game に丸める
+        assert_eq!(normalize_category(""), "game");
+        assert_eq!(normalize_category("APP"), "game");
+        assert_eq!(normalize_category("foo"), "game");
     }
 
     #[test]
